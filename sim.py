@@ -46,21 +46,21 @@ class Sim(object):
         is_done = False
         step_count = 0
 
-        target_distance = random.uniform(0.5, 50)
+        target_distance = 15
         current_distance = 0
 
-        left_speed_cof = random.uniform(0.8, 1.0)
-        right_speed_cof = random.uniform(0.8, 1.0)
+        left_speed_cof =1
+        right_speed_cof = 1
 
-        max_accell = random.uniform(2.8,4)
-        max_vel = random.uniform(2.5, 3.2)
+        max_accell = 3
+        max_vel = 4
 
         current_vel = 0
         current_accel = 0
-        time_step = 0.1
+        time_step = 0.2
         steps = []
 
-        friction_coeff = random.uniform(0.5, 0.95)
+        friction_coeff = 0.8
         
         max_throttle = 0
         
@@ -96,14 +96,15 @@ class Sim(object):
         time_total = step_count * time_step
         print("Took: " + str(time_total)  + "s. to go " + str(target_distance) + "m. Max Speed: " + str(max_throttle) + " avg speed " + str(target_distance/time_total))
         error_norm = ((target_distance - current_distance) / target_distance  )
-        error_norm = abs(error_norm)
-        #error_norm = max(min(error_norm, 1), 0)
-        error_norm *= 10
-        current_vel = current_vel / 5
-        current_accel = current_accel / 5
+        error_norm = abs(error_norm) 
+        error_norm = error_norm / 10
+        error_norm = max(min(error_norm, 1), 0)
+     
+        current_vel = current_vel / 10
+        current_accel = current_accel / 10
 
         
-        self.controller.result([error_norm , current_vel, current_accel, step_count * time_step], time_total)
+        self.controller.result([error_norm], time_total)
        # error_norm = max(min(error_norm, 1), -1)
         return (steps, time_total, error_norm)
        

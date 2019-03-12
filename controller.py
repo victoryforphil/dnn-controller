@@ -19,24 +19,30 @@ class Controller(object):
         current_accel = current_accel / 5
 
         
-
-        self.last_state = numpy.array([error_norm, current_vel, current_accel, time])
-
-        self.last_state = self.last_state.reshape(-1,4)
+#, current_vel, current_accel, time
+        self.last_state = numpy.array([error_norm])
+#
+    #    self.last_state = self.last_state.reshape(-1,4)
 
         #print(self.last_state.shape)
 
         out = self.model.predict(self.last_state)
-       # print(out)
+       
         out = out[0][0]
         out = max(min(out, 1), -1)
+
+        
+        #self.model.fit(self.last_state, [0], epochs=1, verbose=0) 
       
        # print(str(self.last_state) + " -> " + str(out))
         return out
     def result(self, state, time):
         state =  numpy.array(state)
-        state = state.reshape(-1,4)
+       
+        #state = state.reshape(-1,4)
         print(str(numpy.abs(state)))
         self.model.fit(state, [0], epochs=1) 
+        #layer_output = self.model.get_layer('main_1').get_weights()
+        #print(layer_output)
         self.itr = 0
      
