@@ -1,119 +1,103 @@
 import matplotlib.pyplot as plt
 import random
+import numpy as np
 
-class Sim(object):
-    def __init__(self, cntrlr):
-        print("Simulating")
-        self.controller = cntrlr
+class Simulator (object):
+    def __init__(self):
+        
+        self.time_step = 0.1 #0.1s per step
 
-    def run_multiple(self, instances):
-        count = 0
+        self.current_state = None
+        self.current_accel = 0 # Set on reset
+        self.current_vel   = 0
+        self.current_pos   = 0
+        self.current_tgt   = 0 # Set on reset
+        self.current_dif   = 0
+        self.current_step  = 0
+        self.current_input = 0 
+        self.current_fric  = 0 # Set on reset
+        self.current_done  = False;
 
-        average_time = 0
-        total_time = 0
-        last_run = None
-        last_error = 0
+        self.max_accel = 4.0
+        self.min_accel = 3.0
+        self.max_vel   = 3.9
+        self.max_tgt   = 20.0
+        self.min_tgt   = 10.0
+        self.max_fric  = 0.9
+        self.min_fric  = 0.4
+        self.max_step  = 100
 
-       
-        plt.ion()
-        plt.show()
-       
+        self.reset()
 
-        while count < instances:
-            count += 1
-            last_run, time, error= self.run()
-            last_error = error
-            total_time += time
-            #self.graph_run(last_run)
-            plt.cla()
-            plt.plot(last_run)
-            plt.legend( ('Throttle','Acc', 'Vel', 'Pos', "Target"), loc='upper left', shadow=True)
-            plt.xlabel('steps (s)')
-            plt.ylabel('distance (mV)')
-            plt.title('About as simple as it gets, folks')
-            plt.grid(True)
-            plt.savefig("graph.png")
-            plt.draw()
-            plt.pause(0.001)
+    def get_input_dims(self):
+        return len(self.get_current_state())
+
+    def dqn_step(self, input):
+        new_state = self.simulate(input)
+        reward = self.calculate_reward(new_state)
+        done = self.current_done
+        return (new_state, reward, done)
+
+    def simulate(self, input):
+
+        if self.current_done:
+            self.reset()
+            return
+
+        self.current_input = input
+
+        self.current_accel  = self.current_accel * self.current_input
+        self.current_accel -= (self.current_fric * self.current_vel)
+        self.current_vel   += self.time_step * self.current_accel
+        self.current_vel    = self.clamp(self.current_vel, -1.0, 1.0)
+
+        self.current_pos  += current_vel * self.time_step
+        self.current_step += 1
+
+        self.current_dif = (self.current_tgt - self.current_pos)
+
+        self.current_state = self.get_current_state()
+
+        if self.current_step > self.max_step:
+            self.current_done = True
             
-
-        average_time = total_time / instances
-        print("Runs on avg took: " + str(average_time))    
+        if abs(self.current_dif) < 0.1 and abs(self.current_vel) < 0.1 :
+            self.current_done = True
         
-        return (average_time, last_error)
+        return self.current_state
+    
+    def get_current_state(self):
+        return [self.current_dif, self.current_accel, self.current_vel]
 
-    def run(self):
-        is_done = False
-        step_count = 0
+    def clamp(self, val, minX, maxX):
+        return max(min(val, maxX), minX)
 
-        target_distance = 15
-        current_distance = 0
+    def calculate_error(self, state):
+        error = state[0]
+        error = error / self.current_tgt
+        return abs(error)
 
-        left_speed_cof =1
-        right_speed_cof = 1
+    def calculate_reward(self, state):
+        error = self.calculate_error(state)
+        error = self.clamp(error, 0, 1.0)
+        error_rwd = 1.0 - error
 
-        max_accell = 3
-        max_vel = 4
+        velocity = self.state[2]
+        velocity_rwd = 1.0 =abs(velocity)
 
-        current_vel = 0
-        current_accel = 0
-        time_step = 0.2
-        steps = []
+        time = self.current_step / self.max_step
 
-        friction_coeff = 0.8
-        
-        max_throttle = 0
-        
-        while not is_done:
-            throttle = self.controller.process(current_distance, target_distance, current_vel, current_accel, step_count * time_step)
-            
-           # throttle *= left_speed_cof
+        reward = (velocity_rwd + time + error_rwd ) / 3
+        return reward
 
-            if throttle > max_throttle:
-                max_throttle = throttle
-
-
-            current_accel = max_accell * throttle
-            current_accel -= (friction_coeff * current_vel)
-            current_vel += time_step*current_accel
-            
-
-            current_vel = max(min(current_vel, max_vel), - max_vel)
-
-        
-
-            current_distance += current_vel * time_step
-            step_count+=1
-        
-            steps.append( (throttle, current_accel ,current_vel, current_distance, target_distance))
-            
-            if abs(current_distance - target_distance) < 0.05 and abs(current_vel) < 0.05:
-                is_done = True
-
-            if step_count * time_step > 100:
-                is_done = True
-
-        time_total = step_count * time_step
-        print("Took: " + str(time_total)  + "s. to go " + str(target_distance) + "m. Max Speed: " + str(max_throttle) + " avg speed " + str(target_distance/time_total))
-        error_norm = ((target_distance - current_distance) / target_distance  )
-        error_norm = abs(error_norm) 
-        error_norm = error_norm / 10
-        error_norm = max(min(error_norm, 1), 0)
-     
-        current_vel = current_vel / 10
-        current_accel = current_accel / 10
-
-        
-        self.controller.result([error_norm], time_total)
-       # error_norm = max(min(error_norm, 1), -1)
-        return (steps, time_total, error_norm)
-       
-    def graph_run(self, run):
-        plt.plot(run)
-        
-        
-
-            
-                
-
-            
+    def reset(self):
+        self.current_state = None
+        self.current_accel = random.uniform(self.min_accel, self.max_accel)
+        self.current_vel   = 0
+        self.current_pos   = 0
+        self.current_tgt   = random.uniform(self.min_tgt,   self.max_tgt)
+        self.current_dif   = 0
+        self.current_step  = 0
+        self.current_input = 0
+        self.current_fric  = random.uniform(self.min_fric,  self.max_fric)
+        self.current_done  = False;
